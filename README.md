@@ -19,7 +19,7 @@ Run it on the host, as a user who can `sudo`. The installer:
 2. Downloads the package for your distribution.
 3. Verifies it against the release's signed checksums, using the public key built into the script.
 4. Installs it with `apt` or `dnf`.
-5. Enrolls the host with the token and starts the `forensic-agent` service.
+5. Enrolls the host with the token and starts the `jane-agent` service.
 
 The host appears in the dashboard within a minute. Running the installer again upgrades the agent in place.
 
@@ -51,10 +51,10 @@ Check the fingerprint against this page, not only against the key that came with
 ## Install by hand
 
 ```sh
-sudo apt install ./forensic-agent_0.1.0-1_amd64.deb      # Debian, Ubuntu
-sudo dnf install ./forensic-agent-0.1.0-1.x86_64.rpm     # RHEL, Rocky, Alma, Amazon Linux
-sudo forensic-agent enroll -                             # paste the token, then press Ctrl-D
-sudo systemctl enable --now forensic-agent
+sudo apt install ./jane-agent_<version>-1_amd64.deb      # Debian, Ubuntu
+sudo dnf install ./jane-agent-<version>-1.x86_64.rpm     # RHEL, Rocky, Alma, Amazon Linux
+sudo jane-agent enroll -                             # paste the token, then press Ctrl-D
+sudo systemctl enable --now jane-agent
 ```
 
 ## How the agent protects its keys
@@ -75,8 +75,8 @@ re-enroll it with a new token.
 ## Uninstall
 
 ```sh
-sudo apt purge forensic-agent       # also deletes /etc/forensic-agent and /var/lib/forensic-agent
-sudo dnf remove forensic-agent      # keeps them; delete both by hand to remove every trace
+sudo apt purge jane-agent       # also deletes /etc/jane-agent and /var/lib/jane-agent
+sudo dnf remove jane-agent      # keeps them; delete both by hand to remove every trace
 ```
 
 Then revoke the host in the dashboard.
