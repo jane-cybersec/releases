@@ -1,7 +1,9 @@
 # JANE forensic agent: releases
 
-This repository publishes the JANE forensic agent for Linux. Each [release](../../releases) contains the `.deb` and
-`.rpm` packages, a tarball, the installer script, and a signed list of checksums.
+This repository publishes the JANE forensic agent for Linux and for Windows. Each [release](../../releases) contains,
+for Linux, the `.deb` and `.rpm` packages, a tarball, the installer script and a signed list of checksums, and for
+Windows, a zip package, its installer script and its own signed list of checksums. [Install on Windows](#install-on-windows)
+is further down.
 
 ## Install
 
@@ -34,6 +36,71 @@ expires, so create a new one for each host.
 - Older systems are refused before anything is installed: for example Ubuntu 20.04 on its stock 5.4 kernel, RHEL 8 or
   Amazon Linux 2.
 - Outbound access to the JANE ingest endpoint named in your enrollment token.
+
+## Install on Windows
+
+In the JANE dashboard, go to **Hosts → Enroll host**, choose Windows and copy the command. Paste it in a PowerShell
+opened **as administrator**. It looks like this, with a one-time enrollment token already filled in:
+
+```powershell
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; $env:FORENSIC_TOKEN = 'fat1.…'; irm https://github.com/jane-cybersec/releases/releases/download/v0.2.0/install.ps1 | iex
+```
+
+The installer:
+
+1. Checks the host can run the agent and reports every problem at once.
+2. Downloads the package, its checksums and their signature.
+3. Verifies the signature with the public key built into the script and the package against the signed checksums. If
+   either fails, **nothing is installed**.
+4. Copies the agent to `C:\Program Files\Jane\jane-agent` and creates the `jane-agent` service (it runs as LocalSystem,
+   starts with Windows, and restarts by itself if it fails).
+5. Enrolls the host with the token and starts the service.
+
+The host appears in the dashboard within a minute. Running the installer again upgrades the agent in place. The token
+is read from the environment and never printed or stored, and each token works once and expires.
+
+### Requirements for Windows
+
+- x64 Windows 10 22H2 (build 19045) or newer, with Windows PowerShell 5.1 or later, and an administrator.
+- Tested end to end on Windows 11. Windows 10 22H2 and Windows Server are accepted by the installer's checks but have not
+  been tested end to end yet.
+- Outbound access to the JANE ingest endpoint named in your enrollment token.
+
+### Verify a Windows release by hand
+
+The installer does this for you. `SHA256SUMS.windows` is signed with an ECDSA P-256 key (`SHA256SUMS.windows.sig`, 64
+bytes). The public half is the value of `ReleaseKeyPoint` near the top of `install.ps1`, and must be:
+
+```
+lH9xJQ82yhM0iwSWN04+AmvZ5bA6wiNTs2OhuzgMmCW7mqol+msEzWC3nl/MYmxyLgNh1nlEWpZ/TKz31atRRw==
+```
+
+(the SHA-256 of those 64 bytes is `a576835e200611a050febee1f621ae740e494b8e742a8d98b0bb048ecf399730`). Check it against
+this page, not only against the script that came with the download. To check the package against the checksums:
+
+```powershell
+(Get-FileHash .\jane-agent-<version>-windows-amd64.zip -Algorithm SHA256).Hash   # compare with its line in SHA256SUMS.windows
+```
+
+### Install on Windows by hand
+
+Download the zip from the release, verify it, then in an administrator PowerShell:
+
+```powershell
+Expand-Archive .\jane-agent-<version>-windows-amd64.zip -DestinationPath 'C:\Program Files\Jane\jane-agent'
+'<token>' | & 'C:\Program Files\Jane\jane-agent\jane-agent.exe' enroll -
+New-Service -Name jane-agent -BinaryPathName '"C:\Program Files\Jane\jane-agent\jane-agent.exe" service' -DisplayName 'JANE forensic agent' -StartupType Automatic
+Start-Service jane-agent
+```
+
+### Uninstall on Windows
+
+```powershell
+$env:FORENSIC_UNINSTALL = '1'; irm https://github.com/jane-cybersec/releases/releases/download/v0.2.0/install.ps1 | iex
+```
+
+This removes the service and the program. The agent's data and keys stay in `C:\ProgramData\Jane\jane-agent`; set
+`$env:FORENSIC_PURGE = '1'` as well to remove them too. Then revoke the host in the dashboard.
 
 ## Verify a release by hand
 
@@ -68,6 +135,7 @@ each host has:
 | `tpm2` | `systemd-creds` and a usable TPM2 | No |
 | `host_key` | `systemd-creds`, no usable TPM2 (most cloud VMs) | Yes, if the whole disk is copied |
 | `unsealed` | systemd older than 250, no `systemd-creds` (Ubuntu 22.04) | Yes |
+| `dpapi_machine` | Windows: the key is protected with DPAPI, machine scope | Yes, if the whole disk is copied and it is not encrypted (BitLocker) |
 
 To move a host to `tpm2`, give it a TPM2 (for example a vTPM from your cloud provider, which needs UEFI boot), then
 re-enroll it with a new token.
